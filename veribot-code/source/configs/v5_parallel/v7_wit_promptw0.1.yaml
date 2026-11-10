@@ -1,0 +1,27 @@
+# ParaCloud parallel SFT variant: v7_wit_promptw0.1
+# Qwen3-0.6B ONLY. Derived from configs/e2_sft_0.6b.yaml; only this variant's knob differs.
+# Fair-comparison invariants (DO NOT change across variants): data, batch_size, grad_accum,
+# epochs, dev_eval_limit, patience, min_delta. Metrics logged per epoch: completion-only dev
+# NLL (validation loss), acc, bot-F1, macro-F1, balanced-acc, format-valid, confusion.
+# !! WIT variant: prompt tokens weighted 0.1 (not -100 masked), completion 1.0.
+# !! DO NOT SUBMIT until weighted-loss impl passes completion-mask + single-batch smoke.
+requires_smoke: true
+model_name: /path/to/cluster_workspace/veriroute_v4_parallel/models/Qwen3-0.6B
+max_length: 3600
+max_new_tokens: 320
+seed: 0
+lora_rank: 32
+lora_alpha: 64
+lora_dropout: 0.05
+epochs: 4
+batch_size: 4
+grad_accum: 8
+lr: 0.0001
+weight_decay: 0.01
+warmup_ratio: 0.03
+grad_clip: 1.0
+dev_eval_limit: 500
+patience: 2
+min_delta: 0.003
+prompt_loss_weight: 0.1
+completion_loss_weight: 1.0

@@ -1,0 +1,81 @@
+# VeriRoute-Lite hyperparameters (design spec sections 5 and 6).
+# model_name: switched from Qwen3-0.6B to Qwen3-8B (user request). There is no Qwen "7B" in any
+# generation; Qwen3-8B is the closest dense size and stays in the same Qwen3 family/tokenizer/chat
+# template already used elsewhere in this codebase. Batch sizes below are reduced vs. the 0.6B
+# defaults (with gradient_accumulation raised to hold effective batch size roughly constant) as a
+# conservative starting point for the larger model's activation memory; retune once you've watched
+# actual GPU memory usage on the A800.
+model_name: Qwen/Qwen3-8B
+max_length: 4096
+max_completion_length: 640
+
+lora_rank: 32
+lora_alpha: 64
+lora_dropout: 0.05
+
+# Stage 1: cold-start SFT (section 5)
+sft:
+  learning_rate: 0.0001
+  epochs: 2
+  batch_size: 2
+  gradient_accumulation_steps: 16
+  lambda_y: 1.5   # L_label weight
+  lambda_c: 1.0   # L_claim weight
+  lambda_s: 0.5   # L_status weight
+  # L_select (evidence_ids) implicitly has weight 1, per spec section 5
+
+# Stage 2: Active-GRPO (section 6)
+# IMPORTANT: this is a round-based loop (train_grpo.py), NOT one pass over the full training file.
+# Total accounts touched (with replacement across rounds) = rounds x round_size. With the defaults
+# below that is 50 x 48 = 2,400 account-slots -- about 0.36% of the 672,744-account unified train
+# set. Raise rounds/round_size for a run meant to actually cover the dataset; these defaults are a
+# pilot scale meant to validate reward/API-cost/VRAM behavior first (see spec section 9's own
+# recommendation to measure real per-sample call counts before committing to a full run).
+grpo:
+  group_size: 6            # G, section 6.2 (spec range 4-8)
+  learning_rate: 0.000005
+  beta_kl: 0.04            # KL(pi_theta || pi_ref), pi_ref = cold-start checkpoint
+  epsilon_clip: 0.2        # PPO-style clip range
+  batch_size: 2
+  gradient_accumulation_steps: 12
+  rounds: 30                # each round re-filters the pool with the current policy (section 6.1)
+  round_size: 48             # accounts (prompts) materialized per round
+  steps_per_round: -1        # -1 = one full epoch over that round's round_size accounts
+
+# Active-GRPO confidence head + pre-rollout skip filter (section 6.1)
+confidence_head:
+  k: 5                     # number of confidence buckets
+  mlp_hidden: 256
+  delta_p: 0.6              # vote v2: max(p_0, p_{K-1}) > delta_p
+  delta_m: 0.3              # vote v3: extreme-bucket margin > delta_m
+  v_min: 2                  # need >= v_min of {v1,v2,v3} to skip
+  lambda_calib: 0.1          # weight of L_calib; trained via a periodic separate backward pass that
+  # shares the GRPOTrainer's optimizer (see train_grpo.py CalibrationCallback docstring) -- NOT a
+  # single fused L_GRPO + lambda*L_calib backward, because TRL's GRPOTrainer does not expose a hook
+  # to inject an extra loss term into its own backward pass. Documented deviation from spec 6.1.
+  calib_every: 1             # run a calibration step every N GRPO steps
+  skip_audit_rate: 0.05      # spec section 10 item 2: fraction of would-be-skips forced through anyway
+  warmup_rounds: 2           # rounds where the filter is bypassed so the head sees real calibration
+  # data before being trusted to skip anything (an untrained random head can otherwise skip 100% of
+  # a round by chance -- observed during validation of this pipeline)
+  # NOTE: these thresholds are the paper's starting point, not tuned for this task; recalibrate on a
+  # held-out slice of the unified dataset before trusting the skip rate in a full run (spec section 10.5).
+
+reward:
+  hybrid_weights: {q_claims: 0.25, s_sufficiency: 0.25, s_necessity: 0.25, r_length: 0.25}
+  lambda_min: 0.5           # weight on min(q_j) vs mean(q_j) inside Q(C), section 6.3(3)
+  length_min_threshold: 0.05
+  judge_k: 5                # independent APPROVE/REJECT votes per judgment, majority fraction taken
+  judge_workers: 32         # API requests in flight; the K=5 votes are submitted simultaneously
+  reward_workers: 12        # completion-level reward evaluations in parallel
+  judge_temperature: 0.7
+  judge_model: deepseek-v4-flash
+  judge_vote_scheme: approve_reject   # not a self-reported probability, see llm_client.py
+
+units:
+  burst_window_minutes: 15
+  burst_min_count: 5
+  similarity_threshold: 0.90
+  max_similarity_obs: 6
+
+disk_stop_percent: 85
