@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -eo pipefail
 cd /root/private_data/hanning/veribot_workspace
 
 export PYTHONPATH="/root/private_data/hanning/veribot_workspace/code/source:$PYTHONPATH"

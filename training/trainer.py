@@ -453,7 +453,7 @@ def main() -> None:
     best_epoch = 0
     stale = 0
     best_state = None
-    args.output.mkdir(parents=True)
+    args.output.mkdir(parents=True, exist_ok=True)
 
     for epoch in range(1, args.epochs + 1):
         random.shuffle(train)
