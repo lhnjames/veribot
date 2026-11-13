@@ -109,6 +109,7 @@ def train_if_needed(cfg: dict, s: int, rs: int) -> tuple[Path, Path]:
             "--cache", str(cfg["cache"]),
             "--output", str(fwd_dir),
             "--seed", str(s),
+            "--overwrite",
             *UNIFIED_FWD_ARGS,
         ]
         run_cmd(cmd)
@@ -121,6 +122,7 @@ def train_if_needed(cfg: dict, s: int, rs: int) -> tuple[Path, Path]:
             "--cache", str(cfg["cache"]),
             "--output", str(rev_dir),
             "--seed", str(rs),
+            "--overwrite",
             *UNIFIED_REV_ARGS,
         ]
         run_cmd(cmd)

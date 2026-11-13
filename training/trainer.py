@@ -395,10 +395,16 @@ def main() -> None:
     p.add_argument("--synergy-weight", type=float, default=0.10)
     p.add_argument("--synergy-margin", type=float, default=0.40)
     p.add_argument("--logit-l2", type=float, default=0.004)
+    p.add_argument("--overwrite", action="store_true", help="Overwrite existing output directory")
     args = p.parse_args()
 
     if args.output.exists() and any(args.output.iterdir()):
-        raise FileExistsError(args.output)
+        if args.overwrite:
+            import shutil
+            shutil.rmtree(args.output)
+        else:
+            raise FileExistsError(args.output)
+    args.output.mkdir(parents=True, exist_ok=True)
     torch.set_num_threads(4)
     random.seed(args.seed)
     np.random.seed(args.seed)
