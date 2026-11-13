@@ -1,0 +1,27 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Checkpoints and models
+*.pt
+*.pth
+*.ckpt
+checkpoints/
+models/
+
+# Dataset caches and embeddings
+*.npz
+*.npy
+cache/
+data/
+
+# Logs and outputs
+runs/
+*.log
+*.jsonl
+
+# Virtual environments
+.venv/
+env/
+venv/

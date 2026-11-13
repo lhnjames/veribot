@@ -1,2 +1,0 @@
-#!/bin/bash
-cd /path/to/project_root && source activate.sh && python3 -m scripts.augment_cold_start_pattern --input /path/to/data_root/outputs/veriroute_lite/cold_start_sft_v3_revised.jsonl --output /path/to/data_root/outputs/veriroute_lite/cold_start_sft_v4_pattern.jsonl --log /path/to/data_root/outputs/veriroute_lite/augment_pattern_log.jsonl --cache /path/to/data_root/outputs/veriroute_lite/pattern_cache --api-key your-deepseek-api-key-here --max-workers 48 >> /path/to/project_root/outputs/veriroute_lite/augment_pattern_run.log 2>&1

@@ -1,2 +1,0 @@
-#!/bin/bash
-cd /path/to/project_root && source activate.sh && PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True python -m verifiable_bot.train_grpo --data outputs/unified_full/train_twibot20_only.jsonl --sft-merged outputs/veriroute_lite/sft_0.6b_20260722_0252/merged --output outputs/veriroute_lite/grpo_batch_profile_test --judge-cache outputs/veriroute_lite/judge_cache_profile --rounds 4 --round-size 24 --batch-size 8 --grad-accum 3 --max-completion-length 384 --judge-workers 24 --reward-workers 12 >> outputs/veriroute_lite/grpo_batch_profile_test.log 2>&1

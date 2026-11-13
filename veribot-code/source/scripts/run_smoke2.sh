@@ -1,2 +1,0 @@
-#!/bin/bash
-cd /path/to/project_root && source activate.sh && python -m verifiable_bot.train_grpo --data outputs/unified_full/train_twibot20_only.jsonl --sft-merged outputs/veriroute_lite/sft_0.6b_20260722_0252/merged --output outputs/veriroute_lite/grpo_smoke_test2 --judge-cache outputs/veriroute_lite/judge_cache_smoke2 --rounds 3 --round-size 24 --batch-size 6 --grad-accum 4 --max-completion-length 384 --judge-workers 24 --reward-workers 12 >> outputs/veriroute_lite/grpo_smoke_test2.log 2>&1

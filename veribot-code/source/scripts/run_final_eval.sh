@@ -1,2 +1,0 @@
-#!/bin/bash
-cd /path/to/project_root && source activate.sh && python scripts/eval_checkpoint.py --checkpoint outputs/veriroute_lite/grpo_0.6b_balanced/final --base-model outputs/veriroute_lite/sft_0.6b/merged_rebuilt --data outputs/unified_full/validation.jsonl --per-stratum 125 --seed 0 --max-new-tokens 384 --predictions-out outputs/veriroute_lite/eval_balanced_seed0/final_predictions.jsonl > outputs/veriroute_lite/eval_balanced_seed0/final_report.json 2> outputs/veriroute_lite/eval_balanced_seed0/final_stderr.log
