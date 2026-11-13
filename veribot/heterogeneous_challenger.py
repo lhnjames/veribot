@@ -1,14 +1,9 @@
-"""Clean Reverse Model B: Heterogeneous Dual-Query Set-Transformer Challenger.
+"""Heterogeneous Challenger (M_rev): Dual-Query Set-Transformer Adversary.
 
-Architecturally independent from Forward Model A (Self-Attention + Dual Cross-Attention Queries
-vs Forward Model A's within-family pooling + cross-family bilinear heads):
-1. Same PayloadGroundedEncoder zero-payload invariant (zero_all & zero_payload == constant scalar).
-2. ZeroPreservingSetTransformer layers (bias=False QKV/FFN + RMSNorm) strictly masked to valid
-   tokens (or valid & hard_mask when an external witness/counterexample mask is evaluated).
-3. Dual Query Cross-Attention:
-   - q_bot attends over E+_B (Bot witnesses)
-   - q_human attends over E-_B (Human counterexamples)
-4. Zero cardinality terms concatenated into classification heads.
+Standard Academic Nomenclature:
+- Model Name: Heterogeneous Challenger (M_rev)
+- Key Modules: ZeroPreservingSetTransformer, Dual Cross-Attention Query Heads (q_bot, q_human)
+- Output: Bot Witness Logit, Human Counterexample Logit, Orthogonal Witness Subgraphs
 """
 from __future__ import annotations
 import math
@@ -16,7 +11,7 @@ import numpy as np
 import torch
 from torch import nn
 from torch.nn import functional as F
-from verifiable_bot.clean_primitives import PayloadGroundedEncoder, RMSNorm, ZeroPreservingMLP
+from veribot.primitives import PayloadGroundedEncoder, RMSNorm, ZeroPreservingMLP
 
 
 class ZeroPreservingTransformerBlock(nn.Module):
@@ -79,15 +74,15 @@ class ZeroPreservingQueryHead(nn.Module):
         return torch.where(chosen.sum(dim=1) > 0, logit, torch.full_like(logit, -10.0))
 
 
-class CleanChallengerNet(nn.Module):
+class HeterogeneousChallenger(nn.Module):
     def __init__(
         self,
         input_dim: int,
         payload_cols: list[int] | np.ndarray,
-        hidden: int = 160,
+        hidden: int = 128,
         heads: int = 4,
         layers: int = 2,
-        num_freq: int = 6,
+        num_freq: int = 0,
         dropout: float = 0.15,
         local_gate: bool = True,
     ):
@@ -111,7 +106,6 @@ class CleanChallengerNet(nn.Module):
         self.blocks = nn.ModuleList([ZeroPreservingTransformerBlock(hidden, heads=heads, dropout=dropout) for _ in range(layers)])
 
         type_feat_dim = hidden // 2 if self.encoder.d_type > 0 else 0
-        # When local_gate=True, gates observe strictly per-group local payload/type (no global Transformer ctx)
         gate_in_dim = (hidden if local_gate else hidden * 2) + type_feat_dim
         self.bot_gate = nn.Sequential(nn.Linear(gate_in_dim, hidden // 2), nn.GELU(), nn.Linear(hidden // 2, 1))
         self.human_gate = nn.Sequential(nn.Linear(gate_in_dim, hidden // 2), nn.GELU(), nn.Linear(hidden // 2, 1))
@@ -262,3 +256,7 @@ class CleanChallengerNet(nn.Module):
             "mean_gate_probability": bot_prob.sum() / ctx_valid.sum().clamp(min=1),
             "mean_human_gate_probability": hum_prob.sum() / ctx_valid.sum().clamp(min=1),
         }
+
+
+# Backward compatibility alias
+CleanChallengerNet = HeterogeneousChallenger

@@ -1,24 +1,18 @@
-"""Clean Forward Model A: Leakage-Free Cross-Family & Pairwise Synergy Coalition Network.
+"""Forward Evidence Miner (M_fwd): Leakage-Free Cross-Family & Bilinear Synergy Coalition Network.
 
-Design properties:
-1. PayloadGroundedEncoder guarantees zero leakage from masks or static type indicators by construction.
-2. Preserves full relational synergy inductive bias across selected groups E+_u:
-   - Normalized unary evidence summary + family-conditioned witness pooling
-   - All-pair distinct bilinear interaction over selected groups (g1 != g2)
-   - Exact cross-family bilinear interaction (f(g1) != f(g2))
-3. Strictly bias-free scoring head (ZeroPreservingMLP) + single scalar global_bias:
-   zero_all == global_bias and zero_payload == global_bias identically (std == 0.0, AUC == 0.5000).
-4. Zero cardinality vectors concatenated into classification heads, and zero self-attention Transformer
-   blocks (keeping Model A structurally heterogeneous from Model B).
+Standard Academic Nomenclature:
+- Model Name: Forward Evidence Miner (M_fwd)
+- Key Modules: PayloadGroundedEncoder, Unbiased Local Gate, Cross-Family Bilinear Synergy Head
+- Output: Bot Logit, Predecision Selected Evidence Subset E+_fwd, Additive Unary-Only Baseline
 """
 from __future__ import annotations
 import numpy as np
 import torch
 from torch import nn
-from verifiable_bot.clean_primitives import PayloadGroundedEncoder, ZeroPreservingMLP
+from veribot.primitives import PayloadGroundedEncoder, ZeroPreservingMLP
 
 
-class CleanCoalitionNet(nn.Module):
+class ForwardEvidenceMiner(nn.Module):
     def __init__(
         self,
         input_dim: int,
@@ -98,74 +92,72 @@ class CleanCoalitionNet(nn.Module):
             if self.training:
                 u = torch.rand_like(logits).clamp_(1e-6, 1.0 - 1e-6)
                 noise = torch.log(u) - torch.log1p(-u)
-                soft = torch.sigmoid((logits + noise) / temperature) * valid
-                hard = (soft > 0.5).to(dtype=x.dtype)
-                hard.scatter_(1, logits.argmax(dim=1, keepdim=True), 1.0)
-                chosen = hard - soft.detach() + soft
+                continuous = torch.sigmoid((logits + noise) / temperature) * valid
+                hard = (continuous > 0.5).to(dtype=x.dtype)
+                chosen = hard + continuous - continuous.detach()
             else:
-                chosen = (probability >= 0.5).to(dtype=x.dtype)
-                empty = chosen.sum(dim=1) == 0
-                if empty.any():
-                    chosen[empty, logits[empty].argmax(dim=1)] = 1.0
+                chosen = (probability > 0.5).to(dtype=x.dtype) * valid
         else:
             raise ValueError(f"Unknown mode: {mode}")
 
-        chosen = chosen * valid
-        count = chosen.sum(dim=1, keepdim=True).clamp(min=1.0)
-        # Normalized convex mean pooling (zero cardinality skew, preserves f(0) == 0)
-        unary = (chosen.unsqueeze(-1) * self.unary_proj(h)).sum(dim=1) / count
+        b_sz, m_sz, _ = h.shape
+        counts = chosen.sum(dim=1)
+        m_f = chosen.unsqueeze(-1)
 
-        # 1. Exact all-pair distinct bilinear interaction (g1 != g2)
-        left = self.pair_left(h)
-        right = self.pair_right(h)
-        pooled_left = (chosen.unsqueeze(-1) * left).sum(dim=1)
-        pooled_right = (chosen.unsqueeze(-1) * right).sum(dim=1)
-        self_pairs = ((chosen * chosen).unsqueeze(-1) * left * right).sum(dim=1)
-        pair_denom = (count * (count - 1.0)).clamp(min=1.0)
-        pair = (pooled_left * pooled_right - self_pairs) / pair_denom
+        # 1. Unary evidence summary
+        h_unary = (self.unary_proj(h) * m_f).sum(dim=1) / counts.clamp(min=1.0).unsqueeze(-1)
 
-        # 2. Exact cross-family bilinear interaction (f(g1) != f(g2))
-        c_left = self.cross_left(h)
-        c_right = self.cross_right(h)
-        tot_c_left = (chosen.unsqueeze(-1) * c_left).sum(dim=1)
-        tot_c_right = (chosen.unsqueeze(-1) * c_right).sum(dim=1)
-        cross_num = tot_c_left * tot_c_right
-        cross_pairs_count = count * count
+        # 2. Family-conditioned witness pooling (Fams 0..3)
+        fam_pools = []
+        act_fams = []
+        for fid in range(self.num_families):
+            f_mask = chosen * (family_ids == fid).to(dtype=x.dtype)
+            fc = f_mask.sum(dim=1)
+            act_fams.append(fc > 0.5)
+            f_pool = (h * f_mask.unsqueeze(-1)).sum(dim=1) / fc.clamp(min=1.0).unsqueeze(-1)
+            fam_pools.append(f_pool)
 
-        within_num = torch.zeros_like(cross_num)
-        within_cnt = torch.zeros_like(count)
-        fam_present = []
-        for f_id in range(self.num_families):
-            f_mask = chosen * (family_ids == f_id).to(dtype=x.dtype)
-            f_cnt = f_mask.sum(dim=1, keepdim=True)
-            fam_present.append((f_cnt > 0.1).to(dtype=x.dtype))
-            f_l = (f_mask.unsqueeze(-1) * c_left).sum(dim=1)
-            f_r = (f_mask.unsqueeze(-1) * c_right).sum(dim=1)
-            within_num = within_num + f_l * f_r
-            within_cnt = within_cnt + f_cnt * f_cnt
-        cross_num = cross_num - within_num
-        cross_pairs_count = (cross_pairs_count - within_cnt).clamp(min=1.0)
-        cross_pair = cross_num / cross_pairs_count
-        active_fams = sum(fam_present)
+        # 3. All-pair distinct bilinear interaction over selected groups (g1 != g2)
+        u_p = self.pair_left(h)
+        v_p = self.pair_right(h)
+        sum_u = (u_p * m_f).sum(dim=1)
+        sum_v = (v_p * m_f).sum(dim=1)
+        outer_prod = sum_u * sum_v
+        self_prod = ((u_p * v_p) * m_f).sum(dim=1)
+        pair_denom = (counts * (counts - 1.0)).clamp(min=1.0).unsqueeze(-1)
+        h_pair = (outer_prod - self_prod) / pair_denom
+        h_pair = torch.where((counts >= 2.0).unsqueeze(-1), h_pair, torch.zeros_like(h_pair))
 
-        zero_pair = torch.zeros_like(pair)
-        full_in = torch.cat((unary, pair * pair_scale, cross_pair * pair_scale), dim=1)
-        unary_in = torch.cat((unary, zero_pair, zero_pair), dim=1)
+        # 4. Cross-family bilinear interaction (f(g1) != f(g2))
+        num_pairs = 0
+        h_cross = torch.zeros(b_sz, self.pair_dim, device=x.device, dtype=h.dtype)
+        for i in range(self.num_families):
+            for j in range(i + 1, self.num_families):
+                pair_active = (act_fams[i] & act_fams[j]).unsqueeze(-1)
+                term = self.cross_left(fam_pools[i]) * self.cross_right(fam_pools[j])
+                h_cross = h_cross + torch.where(pair_active, term, torch.zeros_like(term))
+                num_pairs += 1
+        h_cross = h_cross / max(num_pairs, 1)
 
-        score = self.head(full_in).squeeze(-1) + self.global_bias
-        unary_score = self.head(unary_in).squeeze(-1) + self.global_bias
+        head_feature = torch.cat((h_unary, pair_scale * h_pair, pair_scale * h_cross), dim=-1)
+        bot_logit = self.head(head_feature).squeeze(-1) + self.global_bias
 
-        has_any = chosen.sum(dim=1) > 0
-        score = torch.where(has_any, score, torch.full_like(score, -10.0))
-        unary_score = torch.where(has_any, unary_score, torch.full_like(unary_score, -10.0))
+        # Additive unary-only baseline
+        unary_feat = torch.cat((h_unary, torch.zeros_like(h_pair), torch.zeros_like(h_cross)), dim=-1)
+        unary_logit = self.head(unary_feat).squeeze(-1) + self.global_bias
 
+        active_family_count = torch.stack(act_fams, dim=1).float().sum(dim=1)
         return {
-            "bot_logit": score,
-            "unary_only_logit": unary_score,
-            "synergy_gain": score - unary_score,
-            "selected": chosen.detach(),
+            "bot_logit": bot_logit,
+            "unary_only_logit": unary_logit,
             "gate_probability": probability,
-            "selected_count": count.squeeze(-1),
-            "active_families": active_fams.squeeze(-1),
-            "mean_gate_probability": probability.sum() / valid.sum().clamp(min=1),
+            "gate_logit": logits,
+            "selected": (chosen > 0.5),
+            "selected_count": counts,
+            "active_families": active_family_count,
+            "synergy_gain": bot_logit - unary_logit,
         }
+
+
+# Backward compatibility alias
+CleanCoalitionNet = ForwardEvidenceMiner

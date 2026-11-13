@@ -7,7 +7,10 @@ Explicitly separates and quantifies:
   decision below threshold and exceeds equal-size random source-closed controls.
 - Tier 3 (Observational Disjoint Witness Depth K / Or-of-Ands): Iterative extraction of mutually
   disjoint source-closed witness coalitions {C_u^(1), ..., C_u^(K)} from V_u until remaining sources
-  cannot support Bot, plus bidirectional alignment with Reverse Model B across {C_u^(1)..C_u^(K)}.
+  cannot support Bot.
+- Bidirectional Orthogonality vs Single-Model Self-Search (Self-CEGAR): Compares witness sets identified
+  by Heterogeneous Challenger M_rev against M_fwd's primary and alternative witness sets, quantifying
+  the rate of non-redundant orthogonal witness discovery.
 - Never claims real-world identity-level necessity from observational feature removals.
 """
 from __future__ import annotations
@@ -17,14 +20,10 @@ from pathlib import Path
 import numpy as np
 import torch
 
-ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "source"))
-from verifiable_bot.synergy_source_net import SynergySourceInteractionNet
-from verifiable_bot.source_interaction_net import SourceInteractionNet
-from verifiable_bot.source_star_challenger_net import SourceStarChallengerNet
-from verifiable_bot.counterexample_challenger_net import CounterexampleChallengerNet
-from verifiable_bot.clean_coalition_net import CleanCoalitionNet
-from verifiable_bot.clean_challenger_net import CleanChallengerNet
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from veribot.forward_miner import ForwardEvidenceMiner, CleanCoalitionNet
+from veribot.heterogeneous_challenger import HeterogeneousChallenger, CleanChallengerNet
 
 
 def group_family_id(name: str) -> int:
@@ -41,78 +40,41 @@ def group_family_id(name: str) -> int:
 def load_model(model_dir: Path, device: torch.device):
     ck = torch.load(model_dir / "model.pt", map_location="cpu", weights_only=False)
     rep = json.loads((model_dir / "report.json").read_text())
-    arch = ck.get("arch", ck.get("architecture", "source_interaction_evidence_network"))
+    arch = str(ck.get("arch", ck.get("architecture", "forward_evidence_miner")))
     input_dim = int(ck["input_dim"])
-    hidden = int(ck.get("hidden", 96))
-    pair_dim = int(ck.get("pair_dim", 24))
-    cgate = bool(ck.get("contextual_gate", False))
-    extra_pool = {}
-    if "mean_pool_by_count" in ck:
-        extra_pool["mean_pool_by_count"] = bool(ck["mean_pool_by_count"])
-    if "include_cardinality_in_head" in ck:
-        extra_pool["include_cardinality_in_head"] = bool(ck["include_cardinality_in_head"])
-    if "clean_challenger" in str(arch):
-        m = CleanChallengerNet(
+
+    if "challenger" in arch or ck.get("role") == "reverse":
+        m = HeterogeneousChallenger(
             input_dim,
-            payload_cols=ck["payload_cols"],
+            payload_cols=ck.get("payload_cols"),
             hidden=int(ck.get("hidden", 128)),
             heads=int(ck.get("heads", 4)),
             layers=int(ck.get("layers", 2)),
-            num_freq=int(ck.get("num_freq", 4)),
+            num_freq=int(ck.get("num_freq", 0)),
             dropout=float(ck.get("dropout", 0.15)),
-            local_gate=bool(ck.get("local_gate", False)),
+            local_gate=bool(ck.get("local_gate", True)),
         ).to(device)
-        kind = "clean_challenger"
-    elif "clean_coalition" in str(arch):
-        m = CleanCoalitionNet(
+        kind = "challenger"
+    else:
+        m = ForwardEvidenceMiner(
             input_dim,
-            payload_cols=ck["payload_cols"],
+            payload_cols=ck.get("payload_cols"),
             hidden=int(ck.get("hidden", 128)),
             pair_dim=int(ck.get("pair_dim", 32)),
             num_families=int(ck.get("num_families", 4)),
-            num_freq=int(ck.get("num_freq", 4)),
-            num_queries=int(ck.get("num_queries", 1)),
+            num_freq=int(ck.get("num_freq", 0)),
+            num_queries=int(ck.get("num_queries", 2)),
             dropout=float(ck.get("dropout", 0.15)),
         ).to(device)
-        kind = "clean_coalition"
-    elif "counterexample" in str(arch):
-        ce_kw = dict(extra_pool)
-        if "strict_hard_mask_context" in ck:
-            ce_kw["strict_hard_mask_context"] = bool(ck["strict_hard_mask_context"])
-        m = CounterexampleChallengerNet(
-            input_dim,
-            hidden=hidden,
-            heads=int(ck.get("heads", 4)),
-            layers=int(ck.get("layers", 2)),
-            contextual_gate=cgate,
-            **ce_kw,
-        ).to(device)
-        kind = "counterexample"
-    elif "synergy" in str(arch):
-        syn_kw = dict(extra_pool)
-        if "num_families" in ck:
-            syn_kw["num_families"] = int(ck["num_families"])
-        m = SynergySourceInteractionNet(input_dim, hidden=hidden, pair_dim=pair_dim, contextual_gate=cgate, **syn_kw).to(
-            device
-        )
-        kind = "synergy"
-    elif "star" in str(arch):
-        m = SourceStarChallengerNet(input_dim, hidden=hidden, contextual_gate=cgate).to(device)
-        kind = "star"
-    else:
-        m = SourceInteractionNet(input_dim, hidden=hidden, pair_dim=pair_dim, contextual_gate=cgate, **extra_pool).to(
-            device
-        )
-        kind = "interaction"
+        kind = "miner"
+
     m.load_state_dict(ck["model_state"])
     m.eval()
     return m, kind, float(rep["dev_threshold"])
 
 
 def run_model(m, kind: str, x: torch.Tensor, v: torch.Tensor, fams: torch.Tensor, **kwargs) -> dict:
-    if kind in ("synergy", "clean_coalition", "clean_challenger"):
-        return m(x, v, fams, **kwargs)
-    return m(x, v, **kwargs)
+    return m(x, v, fams, **kwargs)
 
 
 def filter_non_anchor_raw(raw_ids: set[str]) -> set[str]:
@@ -198,7 +160,7 @@ def main() -> None:
     ap.add_argument("--forward", type=Path, required=True)
     ap.add_argument("--reverse", type=Path, default=None)
     ap.add_argument("--split", choices=("dev", "test"), default="dev")
-    ap.add_argument("--limit", type=int, default=100)
+    ap.add_argument("--limit", type=int, default=0, help="0 means evaluate all true bots")
     ap.add_argument("--max-witness-depth", type=int, default=4)
     ap.add_argument("--random-trials", type=int, default=10)
     ap.add_argument("--out", type=Path, required=True)
@@ -227,7 +189,7 @@ def main() -> None:
             base_logit = float(fo["bot_logit"][0])
             if base_logit < f_thresh:
                 continue
-            if len(rows) >= args.limit:
+            if args.limit > 0 and len(rows) >= args.limit:
                 break
 
             sel_mask = fo["selected"][0].bool()
@@ -317,6 +279,10 @@ def main() -> None:
                 r_after_c1 = float(run_model(r_model, r_kind, x, v, fams, hard_mask=keep_c1[None, :])["bot_logit"][0])
 
                 c1_set = set(primary["coalition_indices"])
+                # Orthogonal witness discovery: groups selected by challenger that are outside M_fwd's primary C1
+                challenger_orthogonal_groups = [names[j] for j in (r_indices - c1_set)]
+                challenger_entirely_new = len(r_indices - union_coalition_indices) > 0
+
                 rev_info = {
                     "reverse_own_logit": float(ro["bot_logit"][0]),
                     "reverse_on_forward_selected_logit": r_on_fwd,
@@ -327,6 +293,9 @@ def main() -> None:
                     "reverse_hits_disjoint_witness_union": bool(r_indices & union_coalition_indices),
                     "reverse_primary_overlap_count": len(r_indices & c1_set),
                     "reverse_union_overlap_count": len(r_indices & union_coalition_indices),
+                    "orthogonal_witness_count": len(challenger_orthogonal_groups),
+                    "orthogonal_witness_groups": challenger_orthogonal_groups,
+                    "captures_disjoint_unexplored_witness": challenger_entirely_new,
                 }
 
             c1_fams = sorted({group_family_id(names[j]) for j in primary["coalition_indices"]})
@@ -392,15 +361,15 @@ def main() -> None:
                 r["tier1_coalition_sufficiency"]["synergy_flips_unary_to_bot"] for r in rows
             )
             / n_aud,
-            "median_coalition_size": float(np.median([r["tier1_coalition_sufficiency"]["coalition_size"] for r in rows])),
-            "mean_synergy_gain": float(np.mean([r["tier1_coalition_sufficiency"]["synergy_gain"] for r in rows])),
+            "median_coalition_size": float(np.median([r["tier1_coalition_sufficiency"]["coalition_size"] for r in rows])) if rows else 0.0,
+            "mean_synergy_gain": float(np.mean([r["tier1_coalition_sufficiency"]["synergy_gain"] for r in rows])) if rows else 0.0,
         },
         "tier2_summary": {
             "conditional_flip_rate": sum(r["tier2_conditional_effect"]["conditional_flip"] for r in rows) / n_aud,
             "dual_pass_rate": sum(r["tier2_conditional_effect"]["dual_pass"] for r in rows) / n_aud,
             "matched_random_dual_pass_rate": float(
                 np.mean([r["tier2_conditional_effect"]["matched_random_dual_pass_rate"] for r in rows])
-            ),
+            ) if rows else 0.0,
             "exceeds_matched_random_drop_rate": sum(
                 r["tier2_conditional_effect"]["exceeds_matched_random_drop"] for r in rows
             )
@@ -429,6 +398,14 @@ def main() -> None:
             / n_aud,
             "reverse_hits_disjoint_witness_union_rate": sum(
                 r["bidirectional_verification"]["reverse_hits_disjoint_witness_union"] for r in rows
+            )
+            / n_aud,
+            "challenger_orthogonal_witness_rate": sum(
+                r["bidirectional_verification"]["orthogonal_witness_count"] > 0 for r in rows
+            )
+            / n_aud,
+            "challenger_unexplored_witness_rate": sum(
+                r["bidirectional_verification"]["captures_disjoint_unexplored_witness"] for r in rows
             )
             / n_aud,
         }

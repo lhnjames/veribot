@@ -13,10 +13,11 @@ import torch
 from torch.nn import functional as F
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, roc_auc_score
 
-ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "source"))
-from verifiable_bot.clean_coalition_net import CleanCoalitionNet
-from verifiable_bot.clean_challenger_net import CleanChallengerNet
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from veribot.forward_miner import ForwardEvidenceMiner, CleanCoalitionNet
+from veribot.heterogeneous_challenger import HeterogeneousChallenger, CleanChallengerNet
+from veribot.primitives import resolve_payload_cols_auto as resolve_payload_cols
 
 
 def sha256_file(path: Path) -> str:
@@ -95,7 +96,7 @@ def resolve_payload_cols(cache: dict, train_positions: list[int], spec: str) -> 
     for lst in by_name.values():
         if len(lst) >= 5:
             used_groups += 1
-            const_within &= np.stack(lst, axis=0).std(axis=0) < 1e-6
+            const_within &= np.stack(lst, axis=0).std(axis=0) < 1e-4
     if used_groups == 0:
         return np.arange(dim, dtype=np.int64)
     return np.where(~const_within)[0].astype(np.int64)
@@ -566,7 +567,7 @@ def main() -> None:
                 if fam_losses:
                     loss = loss + args.cross_family_weight * (sum(fam_losses) / len(fam_losses))
 
-            # Single-group Human humility: singletons should not fire as Bot on Humans
+            # Single-group Human humility: singletons should not fire as Bot on Humans (with chunked OOM protection)
             if args.human_single_neg_weight > 0:
                 human = y < 0.5
                 if human.any():
@@ -574,15 +575,19 @@ def main() -> None:
                     cnt, length, width = hx.shape
                     valid_flat = hv.reshape(-1)
                     one_logits_flat = torch.full((cnt * length,), -1e9, device=device, dtype=torch.float32)
-                    if valid_flat.any():
-                        one_out = model(
-                            hx.reshape(cnt * length, 1, width)[valid_flat],
-                            hv.reshape(cnt * length, 1)[valid_flat],
-                            hf.reshape(cnt * length, 1)[valid_flat],
-                            mode="all",
-                        )
+                    active_idx = torch.nonzero(valid_flat, as_tuple=False).squeeze(-1)
+                    if len(active_idx) > 0:
                         key = "bot_witness_logit" if args.role == "reverse" else "bot_logit"
-                        one_logits_flat[valid_flat] = one_out[key]
+                        chunk_size = 256
+                        for c_start in range(0, len(active_idx), chunk_size):
+                            c_sub = active_idx[c_start : c_start + chunk_size]
+                            chunk_out = model(
+                                hx.reshape(cnt * length, 1, width)[c_sub],
+                                hv.reshape(cnt * length, 1)[c_sub],
+                                hf.reshape(cnt * length, 1)[c_sub],
+                                mode="all",
+                            )
+                            one_logits_flat[c_sub] = chunk_out[key]
                     hardest = one_logits_flat.reshape(cnt, length).masked_fill(~hv, -1e9).amax(dim=1)
                     loss = loss + args.human_single_neg_weight * F.softplus(hardest + 0.25).mean()
 

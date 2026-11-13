@@ -4,6 +4,8 @@
 Evaluates Forward Evidence Miner (M_fwd) & Heterogeneous Challenger (M_rev)
 across 5 random seeds (0, 1, 2, 3, 4) on locked test splits.
 Strict zero-leakage: all checkpoints, thresholds, and refutation rules calibrated on Dev.
+All datasets run strictly through the unified ForwardEvidenceMiner & HeterogeneousChallenger
+with automatic payload column resolution (--payload-cols auto).
 """
 from __future__ import annotations
 import argparse
@@ -17,99 +19,76 @@ import numpy as np
 WORKSPACE = Path("/root/private_data/hanning/veribot_workspace")
 PY = WORKSPACE / ".venv/bin/python"
 
+# Unified Architecture Configurations across all 4 datasets
+UNIFIED_FWD_ARGS = [
+    "--role", "forward",
+    "--payload-cols", "auto",
+    "--hidden", "128",
+    "--pair-dim", "32",
+    "--num-freq", "0",
+    "--num-queries", "2",
+    "--dropout", "0.15",
+    "--epochs", "65",
+    "--patience", "18",
+    "--batch-size", "32",
+    "--lr", "6e-4",
+    "--min-frac", "0.24",
+    "--max-frac", "0.38",
+    "--per-family-budget",
+    "--budget-weight", "2.5",
+    "--slot-parity-weight", "0.0",
+    "--subset-weight", "0.40",
+    "--family-drop-prob", "0.25",
+    "--cross-family-weight", "0.15",
+    "--human-single-neg-weight", "0.15",
+    "--synergy-weight", "0.10",
+    "--synergy-margin", "0.40",
+    "--logit-l2", "0.004",
+]
+
+UNIFIED_REV_ARGS = [
+    "--role", "reverse",
+    "--payload-cols", "auto",
+    "--hidden", "128",
+    "--heads", "4",
+    "--layers", "2",
+    "--num-freq", "0",
+    "--dropout", "0.15",
+    "--epochs", "65",
+    "--patience", "18",
+    "--batch-size", "32",
+    "--lr", "6e-4",
+    "--min-frac", "0.24",
+    "--max-frac", "0.38",
+    "--per-family-budget",
+    "--budget-weight", "2.5",
+    "--slot-parity-weight", "0.0",
+    "--subset-weight", "0.40",
+    "--cross-family-weight", "0.15",
+    "--human-single-neg-weight", "0.15",
+    "--logit-l2", "0.004",
+]
+
 CONFIGS = {
     "fox8": {
         "cache": WORKSPACE / "code/data/processed/fox8_v7_motif/evidence_group_cache.pt",
-        "fwd_script": "code/source/scripts/train_synergy_source_net.py",
-        "fwd_args": [
-            "--arch", "synergy", "--hidden", "112", "--pair-dim", "32",
-            "--sparsity", "0.06", "--epochs", "65", "--patience", "20",
-            "--human-single-neg-weight", "0.20", "--synergy-weight", "0.15", "--synergy-margin", "0.60",
-            "--alt-witness-weight", "0.15", "--logit-l2", "0.002", "--contextual-gate",
-            "--mean-pool-by-count", "--no-cardinality-in-head",
-            "--mask-invariance-weight", "0.35", "--payload-cols", "0:88,92"
-        ],
-        "fwd_dir_template": "models/forward/fox8_seed{s}_v7_fixed",
-        "rev_script": "code/source/scripts/train_counterexample_challenger.py",
-        "rev_args": [
-            "--sparsity", "0.04", "--source-cost-weight", "0.005", "--epochs", "65", "--patience", "20",
-            "--human-single-neg-weight", "0.25",
-            "--min-bot-witnesses", "3", "--min-bot-witness-weight", "0.35", "--min-bot-witness-prob", "0.62",
-            "--alt-witness-weight", "0.15", "--logit-l2", "0.002",
-            "--mean-pool-by-count", "--no-cardinality-in-head", "--strict-hard-mask-context",
-            "--mask-invariance-weight", "0.65", "--payload-cols", "0:88,92"
-        ],
-        "rev_dir_template": "models/reverse/fox8_seed{rs}_counterexample_v7_fixed",
+        "fwd_dir_template": "models/forward/fox8_seed{s}_unified",
+        "rev_dir_template": "models/reverse/fox8_seed{rs}_unified",
     },
     "botsim": {
         "cache": WORKSPACE / "code/data/processed/botsim_source_v2_text_graph/evidence_group_cache.pt",
-        "fwd_script": "code/source/scripts/train_synergy_source_net.py",
-        "fwd_args": [
-            "--arch", "synergy", "--hidden", "112", "--pair-dim", "32",
-            "--sparsity", "0.14", "--source-cost-weight", "0.05", "--epochs", "65", "--patience", "20",
-            "--human-single-neg-weight", "0.25", "--synergy-weight", "0.15", "--synergy-margin", "0.60",
-            "--alt-witness-weight", "0.15", "--logit-l2", "0.002", "--contextual-gate",
-            "--mean-pool-by-count", "--no-cardinality-in-head",
-            "--mask-invariance-weight", "0.35", "--payload-cols", "0:64,72:88"
-        ],
-        "fwd_dir_template": "models/forward/botsim_seed{s}_v2_fixed",
-        "rev_script": "code/source/scripts/train_counterexample_challenger.py",
-        "rev_args": [
-            "--sparsity", "0.06", "--epochs", "65", "--patience", "20", "--human-single-neg-weight", "0.25",
-            "--min-bot-witnesses", "2", "--min-bot-witness-weight", "0.35", "--min-bot-witness-prob", "0.62",
-            "--alt-witness-weight", "0.15", "--logit-l2", "0.002",
-            "--mean-pool-by-count", "--no-cardinality-in-head", "--strict-hard-mask-context",
-            "--mask-invariance-weight", "0.35", "--payload-cols", "0:64,72:88"
-        ],
-        "rev_dir_template": "models/reverse/botsim_seed{rs}_counterexample_v2_fixed",
+        "fwd_dir_template": "models/forward/botsim_seed{s}_unified",
+        "rev_dir_template": "models/reverse/botsim_seed{rs}_unified",
     },
     "mgtab": {
         "cache": WORKSPACE / "code/data/processed/mgtab_source_v3/evidence_group_cache.pt",
-        "fwd_script": "code/source/scripts/train_clean_bidir.py",
-        "fwd_args": [
-            "--role", "forward", "--payload-cols", "0:160",
-            "--hidden", "128", "--pair-dim", "32", "--num-freq", "0", "--num-queries", "2",
-            "--dropout", "0.15", "--epochs", "65", "--patience", "18", "--batch-size", "32",
-            "--lr", "6e-4", "--min-frac", "0.24", "--max-frac", "0.38", "--per-family-budget",
-            "--budget-weight", "2.5", "--slot-parity-weight", "0.0", "--subset-weight", "0.40",
-            "--family-drop-prob", "0.25", "--cross-family-weight", "0.15", "--human-single-neg-weight", "0.15",
-            "--synergy-weight", "0.10", "--synergy-margin", "0.40", "--logit-l2", "0.004"
-        ],
-        "fwd_dir_template": "models/forward/mgtab_seed{s}_clean_v3",
-        "rev_script": "code/source/scripts/train_clean_bidir.py",
-        "rev_args": [
-            "--role", "reverse", "--payload-cols", "0:160",
-            "--hidden", "128", "--heads", "4", "--layers", "2", "--num-freq", "0",
-            "--dropout", "0.15", "--epochs", "65", "--patience", "18", "--batch-size", "32",
-            "--lr", "6e-4", "--min-frac", "0.24", "--max-frac", "0.38", "--per-family-budget",
-            "--budget-weight", "2.5", "--slot-parity-weight", "0.0", "--subset-weight", "0.40",
-            "--cross-family-weight", "0.15", "--human-single-neg-weight", "0.15", "--logit-l2", "0.004"
-        ],
-        "rev_dir_template": "models/reverse/mgtab_seed{rs}_clean_v3",
+        "fwd_dir_template": "models/forward/mgtab_seed{s}_unified",
+        "rev_dir_template": "models/reverse/mgtab_seed{rs}_unified",
     },
     "twibot20": {
         "cache": WORKSPACE / "code/data/processed/twibot20_source_v5/evidence_group_cache.pt",
-        "fwd_script": "code/source/scripts/train_clean_bidir.py",
-        "fwd_args": [
-            "--role", "forward", "--payload-cols", "0:298",
-            "--hidden", "128", "--pair-dim", "32", "--num-freq", "0", "--num-queries", "2",
-            "--dropout", "0.15", "--epochs", "65", "--patience", "18", "--batch-size", "32",
-            "--lr", "6e-4", "--min-frac", "0.24", "--max-frac", "0.38", "--per-family-budget",
-            "--budget-weight", "2.5", "--slot-parity-weight", "0.0", "--subset-weight", "0.40",
-            "--family-drop-prob", "0.25", "--cross-family-weight", "0.15", "--human-single-neg-weight", "0.15",
-            "--synergy-weight", "0.10", "--synergy-margin", "0.40", "--logit-l2", "0.004"
-        ],
-        "fwd_dir_template": "models/forward/twibot20_seed{s}_clean_v3",
-        "rev_script": "code/source/scripts/train_clean_bidir.py",
-        "rev_args": [
-            "--role", "reverse", "--payload-cols", "0:298",
-            "--hidden", "128", "--heads", "4", "--layers", "2", "--num-freq", "0",
-            "--dropout", "0.15", "--epochs", "65", "--patience", "18", "--batch-size", "32",
-            "--lr", "6e-4", "--min-frac", "0.24", "--max-frac", "0.38", "--per-family-budget",
-            "--budget-weight", "2.5", "--slot-parity-weight", "0.0", "--subset-weight", "0.40",
-            "--cross-family-weight", "0.15", "--human-single-neg-weight", "0.15", "--logit-l2", "0.004"
-        ],
-        "rev_dir_template": "models/reverse/twibot20_seed{rs}_clean_v3",
+        "fwd_dir_template": "models/forward/twibot20_seed{s}_unified",
+        "rev_dir_template": "models/reverse/twibot20_seed{rs}_unified",
     },
 }
 
@@ -123,13 +102,14 @@ def train_if_needed(cfg: dict, s: int, rs: int) -> tuple[Path, Path]:
     fwd_dir = WORKSPACE / cfg["fwd_dir_template"].format(s=s, rs=rs)
     rev_dir = WORKSPACE / cfg["rev_dir_template"].format(s=s, rs=rs)
 
+    trainer_script = "code/source/training/trainer.py"
     if not (fwd_dir / "report.json").exists() or not (fwd_dir / "model.pt").exists():
         cmd = [
-            str(PY), "-u", cfg["fwd_script"],
+            str(PY), "-u", trainer_script,
             "--cache", str(cfg["cache"]),
             "--output", str(fwd_dir),
             "--seed", str(s),
-            *cfg["fwd_args"]
+            *UNIFIED_FWD_ARGS,
         ]
         run_cmd(cmd)
     else:
@@ -137,11 +117,11 @@ def train_if_needed(cfg: dict, s: int, rs: int) -> tuple[Path, Path]:
 
     if not (rev_dir / "report.json").exists() or not (rev_dir / "model.pt").exists():
         cmd = [
-            str(PY), "-u", cfg["rev_script"],
+            str(PY), "-u", trainer_script,
             "--cache", str(cfg["cache"]),
             "--output", str(rev_dir),
             "--seed", str(rs),
-            *cfg["rev_args"]
+            *UNIFIED_REV_ARGS,
         ]
         run_cmd(cmd)
     else:
@@ -156,8 +136,9 @@ def evaluate_seed(dataset: str, cfg: dict, s: int, rs: int, fwd_dir: Path, rev_d
     res_json = out_dir / f"{dataset}_seed{s}_test.json"
     audit_jsonl = out_dir / f"{dataset}_seed{s}_sample_audit.jsonl"
 
+    eval_script = "code/source/protocols/bidirectional_challenge.py"
     cmd = [
-        str(PY), "-u", "code/source/scripts/audit_bidirectional_challenge.py",
+        str(PY), "-u", eval_script,
         "--cache", str(cfg["cache"]),
         "--forward", str(fwd_dir),
         "--reverse", str(rev_dir),
@@ -171,7 +152,7 @@ def evaluate_seed(dataset: str, cfg: dict, s: int, rs: int, fwd_dir: Path, rev_d
 
 
 def aggregate_dataset(dataset: str, results: list[dict]) -> dict:
-    fwd_acc, fwd_macro_f1, fwd_bot_f1, fwd_pre, fwd_rec = [], [], [], [], []
+    fwd_acc, fwd_macro_f1, fwd_bot_f1, fwd_pre, fwd_rec, fwd_auc = [], [], [], [], [], []
     ref_acc, ref_macro_f1, ref_bot_f1, ref_pre, ref_rec = [], [], [], [], []
     cross_sup, false_ref, true_ref = [], [], []
 
@@ -183,6 +164,8 @@ def aggregate_dataset(dataset: str, results: list[dict]) -> dict:
         fwd_bot_f1.append(fo["bot_f1"])
         fwd_pre.append(fo["precision"])
         fwd_rec.append(fo["recall"])
+        if "auc" in fo:
+            fwd_auc.append(fo["auc"])
 
         cr = t["calibrated_counterexample_refutation"]
         ref_acc.append(cr["acc"])
@@ -213,6 +196,7 @@ def aggregate_dataset(dataset: str, results: list[dict]) -> dict:
             "bot_f1": stats(fwd_bot_f1),
             "precision": stats(fwd_pre),
             "recall": stats(fwd_rec),
+            "auc": stats(fwd_auc) if fwd_auc else {},
         },
         "bidirectional_refutation": {
             "acc": stats(ref_acc),

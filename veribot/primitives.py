@@ -1,13 +1,11 @@
 """Zero-preserving structural primitives for leakage-free verifiable evidence networks.
 
-Design guarantee:
-- Dynamic content payload p_j and static type indicators t_j are structurally separated.
-- PayloadGroundedEncoder maps p_j -> h_j via Periodic Linear Representations (PLR) modulated
-  multiplicatively by t_j (FiLM) and ZeroPreservingMLP blocks.
-- Every downstream layer in the scorer path uses bias=False linear maps, RMSNorm, GELU, and
-  normalized convex pooling, plus a single global output scalar bias b_global.
-- Mathematical identity: whenever selected payload p_j == 0 (for ANY mask or static type vector),
-  h_j == 0 identically -> scorer logit == b_global identically (std == 0.0, AUC == 0.5000).
+Design guarantees:
+1. Dynamic content payload P and static type indicators T are structurally separated.
+2. ZeroPreservingLinear & ZeroPreservingMLP guarantee f(0) == 0 identically (bias=False + RMSNorm).
+3. PayloadGroundedEncoder guarantees h_j == 0 whenever p_j == 0, regardless of static type t_j.
+4. Automatic payload resolution: detects dynamic payload vs constant type columns without hardcoding.
+5. Exact zero invariance: Var(M(0, m)) == 0.0 and AUC_mask_only == 0.5000 mathematically.
 """
 from __future__ import annotations
 import math
@@ -18,7 +16,7 @@ from torch.nn import functional as F
 
 
 class RMSNorm(nn.Module):
-    """Bias-free RMS normalization that preserves exact zeros: RMSNorm(0) == 0."""
+    """Bias-free Root Mean Square normalization that preserves exact zeros: RMSNorm(0) == 0."""
 
     def __init__(self, dim: int, eps: float = 1e-6):
         super().__init__()
@@ -31,7 +29,7 @@ class RMSNorm(nn.Module):
 
 
 class ZeroPreservingMLP(nn.Module):
-    """Bias-free residual-safe MLP: f(0) == 0 identically."""
+    """Bias-free residual-safe multi-layer perceptron: f(0) == 0 identically."""
 
     def __init__(self, in_dim: int, hidden_dim: int, out_dim: int, dropout: float = 0.15):
         super().__init__()
@@ -45,8 +43,74 @@ class ZeroPreservingMLP(nn.Module):
         return self.fc2(self.drop(h))
 
 
+class ModalityScaleNormalizer(nn.Module):
+    """Balances L2 gradient scales between dense text embeddings and sparse graph relation indicators."""
+
+    def __init__(self, dim: int, eps: float = 1e-6):
+        super().__init__()
+        self.eps = eps
+        self.scale = nn.Parameter(torch.ones(1))
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        norm = torch.linalg.norm(x, dim=-1, keepdim=True).clamp(min=self.eps)
+        return (x / norm) * self.scale
+
+
+def resolve_payload_cols_auto(cache: dict, train_positions: list[int], spec: str = "auto") -> np.ndarray:
+    """Automatically separates dynamic payload features from static structural/type indicators.
+    
+    If spec is explicitly provided (e.g. '0:160'), parses the slice.
+    If spec == 'auto', analyzes column-wise variance within identical group names across accounts.
+    Columns with zero variance across identical group slots are static type indicators;
+    columns with non-zero variance are dynamic payload features.
+    """
+    dim = int(cache["features"][0].shape[1])
+    if spec and spec.lower() != "auto":
+        cols: list[int] = []
+        for part in spec.split(","):
+            part = part.strip()
+            if not part:
+                continue
+            if ":" in part:
+                s, e = part.split(":", 1)
+                cols.extend(range(int(s), min(int(e), dim)))
+            else:
+                idx = int(part)
+                if 0 <= idx < dim:
+                    cols.append(idx)
+        return np.array(sorted(set(cols)), dtype=np.int64)
+
+    if "payload_slice" in cache:
+        s, e = int(cache["payload_slice"][0]), int(cache["payload_slice"][1])
+        return np.arange(s, min(e, dim), dtype=np.int64)
+
+    # Automatic variance-based discovery across first 800 training accounts
+    by_name: dict[str, list[np.ndarray]] = {}
+    sample_limit = min(len(train_positions), 800)
+    for pos in train_positions[:sample_limit]:
+        x_np = cache["features"][int(pos)].numpy()
+        for nm, row in zip(cache["group_names"][int(pos)], x_np):
+            lst = by_name.setdefault(nm, [])
+            if len(lst) < 60:
+                lst.append(row)
+
+    const_within = np.ones(dim, dtype=bool)
+    used_groups = 0
+    for lst in by_name.values():
+        if len(lst) >= 5:
+            used_groups += 1
+            const_within &= np.stack(lst, axis=0).std(axis=0) < 1e-4
+
+    if used_groups == 0:
+        return np.arange(dim, dtype=np.int64)
+    payload_cols = np.where(~const_within)[0].astype(np.int64)
+    if len(payload_cols) == 0:
+        return np.arange(dim, dtype=np.int64)
+    return payload_cols
+
+
 class PayloadGroundedEncoder(nn.Module):
-    """Encodes per-group dynamic payload p_j with PLR embeddings + type FiLM modulation.
+    """Encodes per-group dynamic payload P with PLR embeddings + type FiLM modulation.
 
     Guarantees output h_j == 0 identically whenever p_j == 0, regardless of static type t_j.
     Also returns static type slice t_j separately for gating / attention key disambiguation.
@@ -144,9 +208,8 @@ class ZeroPreservingMultiQueryPool(nn.Module):
         m_f: torch.Tensor,
         cnt_f: torch.Tensor,
     ) -> torch.Tensor:
-        k = self.key_proj(h)  # (B, M, D)
-        v = self.val_proj(h)  # (B, M, D)
-        # (B, Q, M)
+        k = self.key_proj(h)
+        v = self.val_proj(h)
         scores = torch.einsum("qd,bmd->bqm", self.queries, k) / math.sqrt(h.shape[-1])
         scores = scores.masked_fill(~safe_mask.unsqueeze(1), -1e9)
         w = torch.softmax(scores, dim=-1) * m_f.unsqueeze(1)

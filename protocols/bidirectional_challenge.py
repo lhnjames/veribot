@@ -20,14 +20,16 @@ import torch
 from scipy.optimize import linear_sum_assignment
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, confusion_matrix
 
-ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "source"))
-from verifiable_bot.synergy_source_net import SynergySourceInteractionNet
-from verifiable_bot.source_interaction_net import SourceInteractionNet
-from verifiable_bot.source_star_challenger_net import SourceStarChallengerNet
-from verifiable_bot.counterexample_challenger_net import CounterexampleChallengerNet
-from verifiable_bot.clean_coalition_net import CleanCoalitionNet
-from verifiable_bot.clean_challenger_net import CleanChallengerNet
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+try:
+    from veribot.forward_miner import ForwardEvidenceMiner, CleanCoalitionNet
+    from veribot.heterogeneous_challenger import HeterogeneousChallenger, CleanChallengerNet
+except ImportError:
+    from verifiable_bot.clean_coalition_net import CleanCoalitionNet
+    from verifiable_bot.clean_challenger_net import CleanChallengerNet
+    ForwardEvidenceMiner = CleanCoalitionNet
+    HeterogeneousChallenger = CleanChallengerNet
 
 
 def group_family_id(name: str) -> int:
@@ -86,68 +88,37 @@ def load_any_model(model_dir: Path, device: torch.device):
         extra_pool["mean_pool_by_count"] = bool(ck["mean_pool_by_count"])
     if "include_cardinality_in_head" in ck:
         extra_pool["include_cardinality_in_head"] = bool(ck["include_cardinality_in_head"])
-    if "clean_challenger" in arch:
-        m = CleanChallengerNet(
+    if "challenger" in arch or ck.get("role") == "reverse":
+        m = HeterogeneousChallenger(
             input_dim,
-            payload_cols=ck["payload_cols"],
+            payload_cols=ck.get("payload_cols"),
             hidden=int(ck.get("hidden", 128)),
             heads=int(ck.get("heads", 4)),
             layers=int(ck.get("layers", 2)),
-            num_freq=int(ck.get("num_freq", 4)),
+            num_freq=int(ck.get("num_freq", 0)),
             dropout=float(ck.get("dropout", 0.15)),
-            local_gate=bool(ck.get("local_gate", False)),
+            local_gate=bool(ck.get("local_gate", True)),
         ).to(device)
         kind = "clean_challenger"
-    elif "clean_coalition" in arch:
-        m = CleanCoalitionNet(
+    else:
+        m = ForwardEvidenceMiner(
             input_dim,
-            payload_cols=ck["payload_cols"],
+            payload_cols=ck.get("payload_cols"),
             hidden=int(ck.get("hidden", 128)),
             pair_dim=int(ck.get("pair_dim", 32)),
             num_families=int(ck.get("num_families", 4)),
-            num_freq=int(ck.get("num_freq", 4)),
-            num_queries=int(ck.get("num_queries", 1)),
+            num_freq=int(ck.get("num_freq", 0)),
+            num_queries=int(ck.get("num_queries", 2)),
             dropout=float(ck.get("dropout", 0.15)),
         ).to(device)
         kind = "clean_coalition"
-    elif "counterexample" in arch:
-        ce_kw = dict(extra_pool)
-        if "strict_hard_mask_context" in ck:
-            ce_kw["strict_hard_mask_context"] = bool(ck["strict_hard_mask_context"])
-        m = CounterexampleChallengerNet(
-            input_dim,
-            hidden=hidden,
-            heads=int(ck.get("heads", 4)),
-            layers=int(ck.get("layers", 2)),
-            contextual_gate=cgate,
-            **ce_kw,
-        ).to(device)
-        kind = "counterexample"
-    elif "synergy" in arch:
-        syn_kw = dict(extra_pool)
-        if "num_families" in ck:
-            syn_kw["num_families"] = int(ck["num_families"])
-        m = SynergySourceInteractionNet(input_dim, hidden=hidden, pair_dim=pair_dim, contextual_gate=cgate, **syn_kw).to(
-            device
-        )
-        kind = "synergy"
-    elif "star" in arch:
-        m = SourceStarChallengerNet(input_dim, hidden=hidden, contextual_gate=cgate).to(device)
-        kind = "star"
-    else:
-        m = SourceInteractionNet(input_dim, hidden=hidden, pair_dim=pair_dim, contextual_gate=cgate, **extra_pool).to(
-            device
-        )
-        kind = "interaction"
     m.load_state_dict(ck["model_state"])
     m.eval()
     return m, kind, float(rep["dev_threshold"])
 
 
 def run_any(m, kind: str, x: torch.Tensor, v: torch.Tensor, fams: torch.Tensor, **kwargs) -> dict:
-    if kind in ("synergy", "clean_coalition", "clean_challenger"):
-        return m(x, v, fams, **kwargs)
-    return m(x, v, **kwargs)
+    return m(x, v, fams, **kwargs)
 
 
 def alignment_scores(
@@ -388,7 +359,18 @@ def calibrate_refutation_rule(dev_records: list[dict], ft: float, rt: float) -> 
         "w_ce": 0.2,
         "w_hce": 0.1,
     }
-    best_key = (round(base_f1, 6), round(base_acc, 6), 0)
+    best_key = (0, round(base_f1, 6), round(base_acc, 6), 0)
+
+    n_dev = len(y)
+    n_folds = 5
+    bot_idx = np.where(y == 1)[0]
+    hum_idx = np.where(y == 0)[0]
+    fold_splits = []
+    for k in range(n_folds):
+        val_bot = bot_idx[k::n_folds]
+        val_hum = hum_idx[k::n_folds]
+        val_idx = np.concatenate([val_bot, val_hum])
+        fold_splits.append(val_idx)
 
     for w_own, w_onf, w_ce, w_hce in (
         (0.4, 0.4, 0.2, 0.15),
@@ -403,12 +385,26 @@ def calibrate_refutation_rule(dev_records: list[dict], ft: float, rt: float) -> 
                 refute = base_pred & ((f_score - ft) < fwd_cap) & (chal < c_th)
                 if not refute.any():
                     continue
+
+                # Cross-validation generalization guard: admissible ONLY IF net gain >= 0 across ALL folds
+                fold_net_gains = []
+                for val_idx in fold_splits:
+                    v_y = y[val_idx]
+                    v_ref = refute[val_idx]
+                    v_fp = int(np.sum(v_ref & (v_y == 0)))
+                    v_tp = int(np.sum(v_ref & (v_y == 1)))
+                    fold_net_gains.append(v_fp - v_tp)
+
+                if any(gain < 0 for gain in fold_net_gains):
+                    continue
+
                 pred = base_pred & (~refute)
                 b_f1 = float(f1_score(y, pred, pos_label=1))
                 acc = float(accuracy_score(y, pred))
                 fp_ref = int(np.sum(refute & (y == 0)))
                 tp_ref = int(np.sum(refute & (y == 1)))
-                key = (round(b_f1, 6), round(acc, 6), fp_ref - tp_ref)
+                min_fold_gain = min(fold_net_gains)
+                key = (min_fold_gain, round(b_f1, 6), round(acc, 6), fp_ref - tp_ref)
                 if key > best_key:
                     best_key = key
                     best_rule = {
