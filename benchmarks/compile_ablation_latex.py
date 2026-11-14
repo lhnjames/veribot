@@ -13,25 +13,25 @@ def format_cell(mean_val, std_val=None, is_pct=True, bold=False):
         s_str = ""
     res = f"${m_str}{s_str}$"
     if bold:
-        res = f"\\mathbf{{{res}}}"
+        res = "\\mathbf{" + res + "}"
     return res
 
 def generate_latex_table(mgtab_summary, twibot_summary, output_path):
     variants = [
-        ("A0_Full_VeriBot", "Full VeriBot (Bidirectional)", "Dim A: Architecture"),
-        ("A1_Homogeneous_Challenger", "Homogeneous Challenger ($M_{\\text{fwd}} \\parallel M_{\\text{fwd}}$)", "Dim A: Architecture"),
-        ("A2_Homogeneous_Ensemble", "Homogeneous Ensemble (Averaging)", "Dim A: Architecture"),
-        ("A3_Unidirectional_Self_Search", "Unidirectional Self-Search (Single-Model)", "Dim A: Architecture"),
-        ("B1_Residual_Only", "Residual Graph Only ($V \\setminus C^*$)", "Dim B: Search Space"),
-        ("B2_FullGraph_CrossAttention", "Full-Graph Cross-Attention", "Dim B: Search Space"),
-        ("B3_Matched_Random_Control", "Matched Random Control", "Dim B: Search Space"),
-        ("C1_Unary_Only", "Unary-Only (No Synergy Pairs)", "Dim C: Representations"),
-        ("C2_Leave_Out_Profile", "w/o Profile Evidence", "Dim C: Representations"),
-        ("C3_Leave_Out_Text", "w/o Text Evidence", "Dim C: Representations"),
-        ("C4_Leave_Out_Topology", "w/o Topology Evidence", "Dim C: Representations"),
-        ("C5_Leave_Out_Temporal", "w/o Temporal Evidence", "Dim C: Representations"),
-        ("D1_Dense_Unconstrained_Budget", "Dense Unconstrained Budget", "Dim D: Invariance & Budget"),
-        ("D2_Standard_Biased_Projection", "Standard Biased Projection ($\\Phi(0) \\ne 0$)", "Dim D: Invariance & Budget"),
+        ("A0_Full_VeriBot", "Full VeriBot (Bidirectional)", "Dim A: Architecture \\& Challenger Orthogonality"),
+        ("A1_Homogeneous_Challenger", "Homogeneous Challenger ($M_{\\text{fwd}} \\parallel M_{\\text{fwd}}$)", "Dim A: Architecture \\& Challenger Orthogonality"),
+        ("A2_Homogeneous_Ensemble", "Homogeneous Ensemble (Probability Averaging)", "Dim A: Architecture \\& Challenger Orthogonality"),
+        ("A3_Unidirectional_Self_Search", "Unidirectional Self-Search (Single-Model Multi-Pass)", "Dim A: Architecture \\& Challenger Orthogonality"),
+        ("B1_Residual_Only", "Residual Graph Only ($V \\setminus C^*$)", "Dim B: Search Space \\& Graph Scoping"),
+        ("B2_FullGraph_CrossAttention", "Full-Graph Cross-Attention", "Dim B: Search Space \\& Graph Scoping"),
+        ("B3_Matched_Random_Control", "Matched Random Control", "Dim B: Search Space \\& Graph Scoping"),
+        ("C1_Unary_Only", "Unary-Only (No Synergy Pairs)", "Dim C: Representation Decomposition"),
+        ("C2_Leave_Out_Profile", "w/o Profile Evidence", "Dim C: Representation Decomposition"),
+        ("C3_Leave_Out_Text", "w/o Text Evidence", "Dim C: Representation Decomposition"),
+        ("C4_Leave_Out_Topology", "w/o Topology Evidence", "Dim C: Representation Decomposition"),
+        ("C5_Leave_Out_Temporal", "w/o Temporal Evidence", "Dim C: Representation Decomposition"),
+        ("D1_Dense_Unconstrained_Budget", "Dense Unconstrained Budget", "Dim D: Budget \\& Invariance Constraints"),
+        ("D2_Standard_Biased_Projection", "Standard Biased Projection ($\\Phi(0) \\ne 0$)", "Dim D: Budget \\& Invariance Constraints"),
     ]
     
     lines = []
@@ -56,9 +56,9 @@ def generate_latex_table(mgtab_summary, twibot_summary, output_path):
     for var_id, var_name, group in variants:
         if group != current_group:
             current_group = group
-            lines.append(f"\\midrule")
-            lines.append(f"\\multicolumn{{9}}{{l}}{\\textit{{\\textbf{{{group}}}}} \\\\")
-            lines.append(f"\\midrule")
+            lines.append("\\midrule")
+            lines.append("\\multicolumn{9}{l}{\\textit{\\textbf{" + group + "}}} \\\\")
+            lines.append("\\midrule")
             
         is_baseline = (var_id == "A0_Full_VeriBot")
         
@@ -87,6 +87,7 @@ def generate_latex_table(mgtab_summary, twibot_summary, output_path):
     lines.append("\\end{table*}")
     
     content = "\n".join(lines)
+    os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(content)
     print(f"Generated LaTeX ablation table at {output_path}")
