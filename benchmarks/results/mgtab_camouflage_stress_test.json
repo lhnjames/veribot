@@ -1,0 +1,47 @@
+{
+  "dataset_cache": "code/data/processed/mgtab_source_v3/evidence_group_cache.pt",
+  "split": "test",
+  "forward_model": "models/forward/mgtab_seed0_unified",
+  "stress_test_results": {
+    "0.1": {
+      "evaluated_bots": 248,
+      "injection_rate": 0.1,
+      "veribot_decision_resilience": 0.8104838709677419,
+      "dense_baseline_decision_resilience": 0.8145161290322581,
+      "camouflage_rejection_rate": 0.6219758064516129,
+      "resilience_gain_over_dense": -0.004032258064516129
+    },
+    "0.2": {
+      "evaluated_bots": 248,
+      "injection_rate": 0.2,
+      "veribot_decision_resilience": 0.6733870967741935,
+      "dense_baseline_decision_resilience": 0.7258064516129032,
+      "camouflage_rejection_rate": 0.6209677419354839,
+      "resilience_gain_over_dense": -0.05241935483870968
+    },
+    "0.3": {
+      "evaluated_bots": 248,
+      "injection_rate": 0.3,
+      "veribot_decision_resilience": 0.5443548387096774,
+      "dense_baseline_decision_resilience": 0.5362903225806451,
+      "camouflage_rejection_rate": 0.6277915632754343,
+      "resilience_gain_over_dense": 0.008064516129032258
+    },
+    "0.4": {
+      "evaluated_bots": 248,
+      "injection_rate": 0.4,
+      "veribot_decision_resilience": 0.5080645161290323,
+      "dense_baseline_decision_resilience": 0.43951612903225806,
+      "camouflage_rejection_rate": 0.6295066413662239,
+      "resilience_gain_over_dense": 0.06854838709677419
+    },
+    "0.5": {
+      "evaluated_bots": 248,
+      "injection_rate": 0.5,
+      "veribot_decision_resilience": 0.27419354838709675,
+      "dense_baseline_decision_resilience": 0.25806451612903225,
+      "camouflage_rejection_rate": 0.6152073732718893,
+      "resilience_gain_over_dense": 0.016129032258064516
+    }
+  }
+}

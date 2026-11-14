@@ -1,0 +1,47 @@
+{
+  "dataset_cache": "code/data/processed/twibot20_source_v5/evidence_group_cache.pt",
+  "split": "test",
+  "forward_model": "models/forward/twibot20_seed0_unified",
+  "stress_test_results": {
+    "0.1": {
+      "evaluated_bots": 580,
+      "injection_rate": 0.1,
+      "veribot_decision_resilience": 0.9672413793103448,
+      "dense_baseline_decision_resilience": 0.9224137931034483,
+      "camouflage_rejection_rate": 0.7770460959548448,
+      "resilience_gain_over_dense": 0.04482758620689655
+    },
+    "0.2": {
+      "evaluated_bots": 580,
+      "injection_rate": 0.2,
+      "veribot_decision_resilience": 0.9689655172413794,
+      "dense_baseline_decision_resilience": 0.9534482758620689,
+      "camouflage_rejection_rate": 0.7774621212121212,
+      "resilience_gain_over_dense": 0.015517241379310345
+    },
+    "0.3": {
+      "evaluated_bots": 580,
+      "injection_rate": 0.3,
+      "veribot_decision_resilience": 0.9603448275862069,
+      "dense_baseline_decision_resilience": 0.9568965517241379,
+      "camouflage_rejection_rate": 0.7647827507350539,
+      "resilience_gain_over_dense": 0.0034482758620689655
+    },
+    "0.4": {
+      "evaluated_bots": 580,
+      "injection_rate": 0.4,
+      "veribot_decision_resilience": 0.9655172413793104,
+      "dense_baseline_decision_resilience": 0.946551724137931,
+      "camouflage_rejection_rate": 0.771040504487024,
+      "resilience_gain_over_dense": 0.01896551724137931
+    },
+    "0.5": {
+      "evaluated_bots": 580,
+      "injection_rate": 0.5,
+      "veribot_decision_resilience": 0.9620689655172414,
+      "dense_baseline_decision_resilience": 0.9482758620689655,
+      "camouflage_rejection_rate": 0.7693794703266963,
+      "resilience_gain_over_dense": 0.013793103448275862
+    }
+  }
+}
