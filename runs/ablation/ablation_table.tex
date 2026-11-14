@@ -1,0 +1,44 @@
+% -------------------------------------------------------------
+% VeriBot Comprehensive 14-Variant Ablation Table (5-Seed Official)
+% -------------------------------------------------------------
+\begin{table*}[t]
+\centering
+\small
+\caption{\textbf{Comprehensive 14-Variant Ablation Study across 4 Dimensions on MGTAB and TwiBot-20 (5-Seed Mean $\pm$ Std).} All models are calibrated strictly on Dev under Zero-Leakage protocols and evaluated on locked Test sets. Macro-F1 is the primary official classification metric.}
+\label{tab:ablation_master}
+\resizebox{\textwidth}{!}{
+\begin{tabular}{l | cccc | cccc}
+\toprule
+& \multicolumn{4}{c|}{\textbf{MGTAB Benchmark}} & \multicolumn{4}{c}{\textbf{TwiBot-20 Benchmark}} \\
+\textbf{Ablation Variant} & \textbf{Acc (\%)} & \textbf{Macro-F1 (\%)} & \textbf{Prec (\%)} & \textbf{Rec (\%)} & \textbf{Acc (\%)} & \textbf{Macro-F1 (\%)} & \textbf{Prec (\%)} & \textbf{Rec (\%)} \\
+\midrule
+\midrule
+\multicolumn{9}{l}{\textit{\textbf{Dim A: Architecture \& Challenger Orthogonality}}} \\
+\midrule
+Full VeriBot (Bidirectional) & \mathbf{$92.84 \pm 0.25$} & \mathbf{$91.06 \pm 0.36$} & \mathbf{$84.94 \pm 0.80$} & \mathbf{$89.31 \pm 1.74$} & \mathbf{$86.51 \pm 0.34$} & \mathbf{$86.33 \pm 0.34$} & \mathbf{$85.52 \pm 0.55$} & \mathbf{$90.38 \pm 0.95$} \\
+Homogeneous Challenger ($M_{\text{fwd}} \parallel M_{\text{fwd}}$) & -- & -- & -- & -- & -- & -- & -- & -- \\
+Homogeneous Ensemble (Probability Averaging) & -- & -- & -- & -- & -- & -- & -- & -- \\
+Unidirectional Self-Search (Single-Model Multi-Pass) & -- & -- & -- & -- & -- & -- & -- & -- \\
+\midrule
+\multicolumn{9}{l}{\textit{\textbf{Dim B: Search Space \& Graph Scoping}}} \\
+\midrule
+Residual Graph Only ($V \setminus C^*$) & $92.84 \pm 0.25$ & $91.06 \pm 0.36$ & $84.94 \pm 0.80$ & $89.31 \pm 1.74$ & -- & -- & -- & -- \\
+Full-Graph Cross-Attention & -- & -- & -- & -- & -- & -- & -- & -- \\
+Matched Random Control & -- & -- & -- & -- & -- & -- & -- & -- \\
+\midrule
+\multicolumn{9}{l}{\textit{\textbf{Dim C: Representation Decomposition}}} \\
+\midrule
+Unary-Only (No Synergy Pairs) & -- & -- & -- & -- & -- & -- & -- & -- \\
+w/o Profile Evidence & -- & -- & -- & -- & -- & -- & -- & -- \\
+w/o Text Evidence & -- & -- & -- & -- & -- & -- & -- & -- \\
+w/o Topology Evidence & -- & -- & -- & -- & -- & -- & -- & -- \\
+w/o Temporal Evidence & -- & -- & -- & -- & -- & -- & -- & -- \\
+\midrule
+\multicolumn{9}{l}{\textit{\textbf{Dim D: Budget \& Invariance Constraints}}} \\
+\midrule
+Dense Unconstrained Budget & -- & -- & -- & -- & -- & -- & -- & -- \\
+Standard Biased Projection ($\Phi(0) \ne 0$) & -- & -- & -- & -- & -- & -- & -- & -- \\
+\bottomrule
+\end{tabular}
+}
+\end{table*}

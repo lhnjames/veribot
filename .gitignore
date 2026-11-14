@@ -17,7 +17,15 @@ cache/
 data/
 
 # Logs and outputs
-runs/
+runs/**
+!runs/
+!runs/ablation/
+!runs/ablation/**/
+!runs/ablation/**/*.json
+!runs/ablation/**/*.tex
+!runs/dual_model/
+!runs/dual_model/**/
+!runs/dual_model/5seeds/*_5seed_summary.json
 *.log
 *.jsonl
 

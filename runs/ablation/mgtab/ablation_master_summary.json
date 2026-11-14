@@ -1,0 +1,310 @@
+{
+  "A0_Full_VeriBot": {
+    "dataset": "mgtab",
+    "n_seeds": 5,
+    "forward_only": {
+      "acc": {
+        "mean": 0.9284313725490196,
+        "std": 0.002499519369408219,
+        "values": [
+          0.92549,
+          0.93039,
+          0.92843,
+          0.93137,
+          0.92647
+        ]
+      },
+      "macro_f1": {
+        "mean": 0.9113217132717942,
+        "std": 0.0035965160391854024,
+        "values": [
+          0.90768,
+          0.91385,
+          0.91085,
+          0.91603,
+          0.9082
+        ]
+      },
+      "bot_f1": {
+        "mean": 0.8723738891248434,
+        "std": 0.005678765074716098,
+        "values": [
+          0.86713,
+          0.87609,
+          0.87125,
+          0.88014,
+          0.86726
+        ]
+      },
+      "precision": {
+        "mean": 0.8399463843466508,
+        "std": 0.006258290541598621,
+        "values": [
+          0.83502,
+          0.84228,
+          0.84589,
+          0.83172,
+          0.84483
+        ]
+      },
+      "recall": {
+        "mean": 0.9076363636363636,
+        "std": 0.01697835277080547,
+        "values": [
+          0.90182,
+          0.91273,
+          0.89818,
+          0.93455,
+          0.89091
+        ]
+      },
+      "auc": {}
+    },
+    "bidirectional_refutation": {
+      "acc": {
+        "mean": 0.9284313725490196,
+        "std": 0.002499519369408219,
+        "values": [
+          0.92647,
+          0.93235,
+          0.92941,
+          0.92647,
+          0.92745
+        ]
+      },
+      "macro_f1": {
+        "mean": 0.9105510864560158,
+        "std": 0.0036205042405664145,
+        "values": [
+          0.9086,
+          0.91609,
+          0.91197,
+          0.90676,
+          0.90933
+        ]
+      },
+      "bot_f1": {
+        "mean": 0.8705637738862402,
+        "std": 0.005749678160164101,
+        "values": [
+          0.86819,
+          0.87916,
+          0.87279,
+          0.86388,
+          0.86879
+        ]
+      },
+      "precision": {
+        "mean": 0.8493951967770924,
+        "std": 0.008028642054939826,
+        "values": [
+          0.84014,
+          0.84797,
+          0.8488,
+          0.86232,
+          0.84775
+        ]
+      },
+      "recall": {
+        "mean": 0.8930909090909089,
+        "std": 0.017363398380092095,
+        "values": [
+          0.89818,
+          0.91273,
+          0.89818,
+          0.86545,
+          0.89091
+        ]
+      },
+      "false_bots_refuted_mean": 4.0,
+      "true_bots_refuted_mean": 4.0,
+      "net_refuted_mean": 0.0,
+      "acc_gain_mean": 0.0
+    },
+    "bidirectional_cross_support_rate": {
+      "mean": 0.2605882352941176,
+      "std": 0.031831810020498126,
+      "values": [
+        0.27451,
+        0.27451,
+        0.20392,
+        0.27941,
+        0.27059
+      ]
+    },
+    "ablation_variant": "A0_Full_VeriBot",
+    "description": "Full VeriBot (Bilinear Miner + Asymmetric Set-Transformer Challenger + Calibrated Refutation)"
+  },
+  "A1_Homogeneous_Challenger": {
+    "status": "dry_run"
+  },
+  "A2_Homogeneous_Ensemble": {
+    "status": "dry_run"
+  },
+  "A3_Unidirectional_Self_Search": {
+    "status": "dry_run"
+  },
+  "B1_Residual_Only": {
+    "dataset": "mgtab",
+    "n_seeds": 5,
+    "forward_only": {
+      "acc": {
+        "mean": 0.9284313725490196,
+        "std": 0.002499519369408219,
+        "values": [
+          0.92549,
+          0.93039,
+          0.92843,
+          0.93137,
+          0.92647
+        ]
+      },
+      "macro_f1": {
+        "mean": 0.9113217132717942,
+        "std": 0.0035965160391854024,
+        "values": [
+          0.90768,
+          0.91385,
+          0.91085,
+          0.91603,
+          0.9082
+        ]
+      },
+      "bot_f1": {
+        "mean": 0.8723738891248434,
+        "std": 0.005678765074716098,
+        "values": [
+          0.86713,
+          0.87609,
+          0.87125,
+          0.88014,
+          0.86726
+        ]
+      },
+      "precision": {
+        "mean": 0.8399463843466508,
+        "std": 0.006258290541598621,
+        "values": [
+          0.83502,
+          0.84228,
+          0.84589,
+          0.83172,
+          0.84483
+        ]
+      },
+      "recall": {
+        "mean": 0.9076363636363636,
+        "std": 0.01697835277080547,
+        "values": [
+          0.90182,
+          0.91273,
+          0.89818,
+          0.93455,
+          0.89091
+        ]
+      },
+      "auc": {}
+    },
+    "bidirectional_refutation": {
+      "acc": {
+        "mean": 0.9284313725490196,
+        "std": 0.002499519369408219,
+        "values": [
+          0.92647,
+          0.93235,
+          0.92941,
+          0.92647,
+          0.92745
+        ]
+      },
+      "macro_f1": {
+        "mean": 0.9105510864560158,
+        "std": 0.0036205042405664145,
+        "values": [
+          0.9086,
+          0.91609,
+          0.91197,
+          0.90676,
+          0.90933
+        ]
+      },
+      "bot_f1": {
+        "mean": 0.8705637738862402,
+        "std": 0.005749678160164101,
+        "values": [
+          0.86819,
+          0.87916,
+          0.87279,
+          0.86388,
+          0.86879
+        ]
+      },
+      "precision": {
+        "mean": 0.8493951967770924,
+        "std": 0.008028642054939826,
+        "values": [
+          0.84014,
+          0.84797,
+          0.8488,
+          0.86232,
+          0.84775
+        ]
+      },
+      "recall": {
+        "mean": 0.8930909090909089,
+        "std": 0.017363398380092095,
+        "values": [
+          0.89818,
+          0.91273,
+          0.89818,
+          0.86545,
+          0.89091
+        ]
+      },
+      "false_bots_refuted_mean": 4.0,
+      "true_bots_refuted_mean": 4.0,
+      "net_refuted_mean": 0.0,
+      "acc_gain_mean": 0.0
+    },
+    "bidirectional_cross_support_rate": {
+      "mean": 0.2605882352941176,
+      "std": 0.031831810020498126,
+      "values": [
+        0.27451,
+        0.27451,
+        0.20392,
+        0.27941,
+        0.27059
+      ]
+    },
+    "ablation_variant": "B1_Residual_Only",
+    "description": "Residual Graph Only (Standard VeriBot search space V \\ E+)"
+  },
+  "B2_FullGraph_CrossAttention": {
+    "status": "dry_run"
+  },
+  "B3_Matched_Random_Control": {
+    "status": "dry_run"
+  },
+  "C1_Unary_Only": {
+    "status": "dry_run"
+  },
+  "C2_Leave_Out_Profile": {
+    "status": "dry_run"
+  },
+  "C3_Leave_Out_Text": {
+    "status": "dry_run"
+  },
+  "C4_Leave_Out_Topology": {
+    "status": "dry_run"
+  },
+  "C5_Leave_Out_Temporal": {
+    "status": "dry_run"
+  },
+  "D1_Dense_Unconstrained_Budget": {
+    "status": "dry_run"
+  },
+  "D2_Standard_Biased_Projection": {
+    "status": "dry_run"
+  }
+}

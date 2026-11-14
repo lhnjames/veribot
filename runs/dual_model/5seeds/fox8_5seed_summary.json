@@ -1,0 +1,134 @@
+{
+  "dataset": "fox8",
+  "n_seeds": 5,
+  "forward_only": {
+    "acc": {
+      "mean": 1.0,
+      "std": 0.0,
+      "values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "macro_f1": {
+      "mean": 1.0,
+      "std": 0.0,
+      "values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "bot_f1": {
+      "mean": 1.0,
+      "std": 0.0,
+      "values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "precision": {
+      "mean": 1.0,
+      "std": 0.0,
+      "values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "recall": {
+      "mean": 1.0,
+      "std": 0.0,
+      "values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "auc": {}
+  },
+  "bidirectional_refutation": {
+    "acc": {
+      "mean": 1.0,
+      "std": 0.0,
+      "values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "macro_f1": {
+      "mean": 1.0,
+      "std": 0.0,
+      "values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "bot_f1": {
+      "mean": 1.0,
+      "std": 0.0,
+      "values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "precision": {
+      "mean": 1.0,
+      "std": 0.0,
+      "values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "recall": {
+      "mean": 1.0,
+      "std": 0.0,
+      "values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "false_bots_refuted_mean": 0.0,
+    "true_bots_refuted_mean": 0.0,
+    "net_refuted_mean": 0.0,
+    "acc_gain_mean": 0.0
+  },
+  "bidirectional_cross_support_rate": {
+    "mean": 0.45186813186813185,
+    "std": 0.055743647030646125,
+    "values": [
+      0.36264,
+      0.44615,
+      0.45275,
+      0.4967,
+      0.5011
+    ]
+  }
+}

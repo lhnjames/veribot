@@ -93,9 +93,11 @@ def generate_latex_table(mgtab_summary, twibot_summary, output_path):
     print(f"Generated LaTeX ablation table at {output_path}")
 
 if __name__ == "__main__":
-    mgtab_p = sys.argv[1] if len(sys.argv) > 1 else "runs/ablation/mgtab/ablation_master_summary.json"
-    twibot_p = sys.argv[2] if len(sys.argv) > 2 else "runs/ablation/twibot20/ablation_master_summary.json"
-    out_p = sys.argv[3] if len(sys.argv) > 3 else "runs/ablation/ablation_table.tex"
+    from pathlib import Path
+    REPO_ROOT = Path(__file__).resolve().parent.parent
+    mgtab_p = sys.argv[1] if len(sys.argv) > 1 else str(REPO_ROOT / "runs/ablation/mgtab/ablation_master_summary.json")
+    twibot_p = sys.argv[2] if len(sys.argv) > 2 else str(REPO_ROOT / "runs/ablation/twibot20/ablation_master_summary.json")
+    out_p = sys.argv[3] if len(sys.argv) > 3 else str(REPO_ROOT / "runs/ablation/ablation_table.tex")
     
     m_dict = {}
     t_dict = {}
