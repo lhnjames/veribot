@@ -113,6 +113,7 @@ def load_any_model(model_dir: Path, device: torch.device):
         ).to(device)
         kind = "clean_coalition"
     m.load_state_dict(ck["model_state"])
+    m.drop_family = int(ck.get("drop_family", -1))
     m.eval()
     return m, kind, float(rep["dev_threshold"])
 
@@ -175,6 +176,9 @@ def collect_split_records(
             sources = cache["raw_source_ids"][i]
             feats_np = cache["features"][i].numpy()
             fams = torch.tensor([[group_family_id(n) for n in names]], dtype=torch.long, device=device)
+            drop_f = getattr(f_model, "drop_family", -1)
+            if drop_f >= 0:
+                v = v & (fams != drop_f)
 
             fo = run_any(f_model, f_kind, x, v, fams, mode="selected")
             f_full = run_any(f_model, f_kind, x, v, fams, mode="all")
@@ -714,6 +718,7 @@ def main() -> None:
     ap.add_argument("--cache", type=Path, required=True)
     ap.add_argument("--forward", type=Path, required=True)
     ap.add_argument("--reverse", type=Path, required=True)
+    ap.add_argument("--drop-family", type=int, default=-1)
     ap.add_argument("--search-budget", type=int, default=4)
     ap.add_argument("--eval-test", action="store_true")
     ap.add_argument("--dump-sample-audit", type=Path, default=None)
@@ -725,6 +730,8 @@ def main() -> None:
     cache = torch.load(args.cache, map_location="cpu", weights_only=False)
     f_model, f_kind, ft = load_any_model(args.forward, device)
     r_model, r_kind, rt = load_any_model(args.reverse, device)
+    if args.drop_family >= 0:
+        f_model.drop_family = args.drop_family
 
     dev_records = collect_split_records(
         cache, "dev", f_model, f_kind, r_model, r_kind, device, search_budget=args.search_budget

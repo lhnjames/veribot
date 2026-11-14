@@ -108,6 +108,7 @@ def batchify(
     slots_all: list[torch.Tensor],
     positions: list[int],
     device: torch.device,
+    drop_family: int = -1,
 ):
     x = [cache["features"][int(i)] for i in positions]
     length = max(len(t) for t in x)
@@ -125,7 +126,11 @@ def batchify(
         fams[j, :L] = fams_all[idx]
         slots[j, :L] = slots_all[idx]
     labels = cache["labels"][list(positions)].float()
-    return padded.to(device), valid.to(device), fams.to(device), slots.to(device), labels.to(device)
+    valid_dev = valid.to(device)
+    fams_dev = fams.to(device)
+    if drop_family >= 0:
+        valid_dev = valid_dev & (fams_dev != drop_family)
+    return padded.to(device), valid_dev, fams_dev, slots.to(device), labels.to(device)
 
 
 def sample_subset_mask(mask: torch.Tensor, min_keep: int = 2, keep_lo: float = 0.55, keep_hi: float = 0.85) -> torch.Tensor:
@@ -250,6 +255,7 @@ def evaluate(
     payload_cols_t: torch.Tensor,
     batch_size: int = 128,
     build_rows: bool = False,
+    drop_family: int = -1,
 ):
     model.eval()
     scores, all_scores, unary_scores, zall_scores, zpay_scores, selected = [], [], [], [], [], []
@@ -257,7 +263,7 @@ def evaluate(
     with torch.inference_mode():
         for start in range(0, len(positions), batch_size):
             ids = positions[start : start + batch_size]
-            x, valid, fams, _slots, _ = batchify(cache, fams_all, slots_all, ids, device)
+            x, valid, fams, _slots, _ = batchify(cache, fams_all, slots_all, ids, device, drop_family=drop_family)
             found = model(x, valid, fams, mode="selected")
             full = model(x, valid, fams, mode="all")
             u_logit = found.get("unary_only_logit", found["bot_logit"])
@@ -395,6 +401,7 @@ def main() -> None:
     p.add_argument("--synergy-weight", type=float, default=0.10)
     p.add_argument("--synergy-margin", type=float, default=0.40)
     p.add_argument("--logit-l2", type=float, default=0.004)
+    p.add_argument("--drop-family", type=int, default=-1, help="If >= 0, mask out this family ID during training and eval")
     p.add_argument("--overwrite", action="store_true", help="Overwrite existing output directory")
     args = p.parse_args()
 
@@ -462,7 +469,7 @@ def main() -> None:
         batches = 0
         for start in range(0, len(train), args.batch_size):
             batch = train[start : start + args.batch_size]
-            x, valid, fams, slots, y = batchify(cache, fams_all, slots_all, batch, device)
+            x, valid, fams, slots, y = batchify(cache, fams_all, slots_all, batch, device, drop_family=args.drop_family)
             human_y = 1.0 - y
             optimizer.zero_grad(set_to_none=True)
 
@@ -604,7 +611,7 @@ def main() -> None:
             batches += 1
 
         values, _all, _u, zall_v, zpay_v, counts, _rows = evaluate(
-            model, args.role, cache, fams_all, slots_all, dev, device, payload_cols_t, build_rows=False
+            model, args.role, cache, fams_all, slots_all, dev, device, payload_cols_t, build_rows=False, drop_family=args.drop_family
         )
         labels = cache["labels"][dev].numpy().astype(int)
         auc = float(roc_auc_score(labels, values))
@@ -642,7 +649,7 @@ def main() -> None:
 
     model.load_state_dict(best_state)
     values, all_vals, unary_vals, zall_vals, zpay_vals, counts, rows = evaluate(
-        model, args.role, cache, fams_all, slots_all, dev, device, payload_cols_t, build_rows=True
+        model, args.role, cache, fams_all, slots_all, dev, device, payload_cols_t, build_rows=True, drop_family=args.drop_family
     )
     swap_orig_auc, swap_resel_auc = eval_content_swap(
         model, cache, fams_all, slots_all, dev, payload_cols, device, seed=args.seed
@@ -694,6 +701,7 @@ def main() -> None:
             "scaler_std": cache["scaler_std"],
             "group_cache_sha256": sha256_file(args.cache),
             "seed": args.seed,
+            "drop_family": args.drop_family,
         },
         checkpoint,
     )

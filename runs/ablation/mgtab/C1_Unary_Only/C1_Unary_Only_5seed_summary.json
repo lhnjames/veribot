@@ -1,0 +1,69 @@
+{
+  "variant": "C1_Unary_Only",
+  "description": "Unary Feature Only (Bilinear synergy disabled, S_ij = 0)",
+  "dataset": "mgtab",
+  "n_seeds": 1,
+  "forward": {
+    "acc": {
+      "mean": 0.9323529411764706,
+      "std": 0.0,
+      "values": [
+        0.93235
+      ]
+    },
+    "macro_f1": {
+      "mean": 0.9146055146055146,
+      "std": 0.0,
+      "values": [
+        0.91461
+      ]
+    },
+    "precision": {
+      "mean": 0.8678571428571429,
+      "std": 0.0,
+      "values": [
+        0.86786
+      ]
+    },
+    "recall": {
+      "mean": 0.8836363636363637,
+      "std": 0.0,
+      "values": [
+        0.88364
+      ]
+    }
+  },
+  "bidirectional": {
+    "acc": {
+      "mean": 0.9313725490196079,
+      "std": 0.0,
+      "values": [
+        0.93137
+      ]
+    },
+    "macro_f1": {
+      "mean": 0.9132699418398433,
+      "std": 0.0,
+      "values": [
+        0.91327
+      ]
+    },
+    "precision": {
+      "mean": 0.8673835125448028,
+      "std": 0.0,
+      "values": [
+        0.86738
+      ]
+    },
+    "recall": {
+      "mean": 0.88,
+      "std": 0.0,
+      "values": [
+        0.88
+      ]
+    },
+    "false_refuted_mean": 0.0,
+    "true_refuted_mean": 1.0,
+    "net_gain_mean": -1.0
+  }
+}
