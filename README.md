@@ -31,7 +31,7 @@ VeriBot is an end-to-end white-box, bidirectional verifiable social bot detectio
 ## 2. Directory Structure
 
 ```text
-veribot_clean_core/
+veribot/
 ├── veribot/                         # Core Model Implementations
 │   ├── primitives.py                # Zero-preserving projections, TypeFiLM, unbiased local gates
 │   ├── forward_miner.py             # Forward Evidence Miner (M_fwd) with Bilinear Synergy Head
